@@ -21,8 +21,8 @@ export function createNote(request: CreateNoteRequest): Note {
 		id: generateId(),
 		title: request.title,
 		content: request.content,
-		createdAt: now,
-		updatedAt: now,
+		createdAt: now.toDateString(),
+		updatedAt: now.toDateString(),
 	};
 
 	notes.push(note);
@@ -44,7 +44,7 @@ export function updateNote(
 		...existingNote,
 		title: request.title ?? existingNote.title,
 		content: request.content ?? existingNote.content,
-		updatedAt: new Date(),
+		updatedAt: new Date().toDateString(),
 	};
 
 	notes[noteIndex] = updatedNote;

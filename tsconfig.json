@@ -9,8 +9,6 @@
 		"esModuleInterop": true,
 		"forceConsistentCasingInFileNames": true,
 		"types": ["node"],
-		"jsx": "react-jsx",
-		"jsxImportSource": "hono/jsx",
 		"outDir": "./dist",
 		"declaration": true,
 		"sourceMap": true

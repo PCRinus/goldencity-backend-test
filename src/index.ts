@@ -1,20 +1,42 @@
 import { serve } from "@hono/node-server";
-import { Hono } from "hono";
+import { swaggerUI } from "@hono/swagger-ui";
+import { OpenAPIHono } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { getNotesCount } from "./notesService";
 import { notesRouter } from "./routes";
 
-const app = new Hono();
+const app = new OpenAPIHono();
 
 app.use("*", logger());
 app.use("*", cors());
+
+app.doc("/doc", {
+	openapi: "3.0.0",
+	info: {
+		version: "1.0.0",
+		title: "Notes API",
+		description: "A simple CRUD API for managing notes",
+	},
+	tags: [
+		{
+			name: "Notes",
+			description: "Operations related to notes management",
+		},
+	],
+});
+
+app.get("/ui", swaggerUI({ url: "/doc" }));
 
 app.get("/", (c) => {
 	return c.json({
 		message: "Notes API is running!",
 		version: "1.0.0",
 		totalNotes: getNotesCount(),
+		documentation: {
+			openapi: "/doc",
+			swaggerUI: "/ui",
+		},
 	});
 });
 

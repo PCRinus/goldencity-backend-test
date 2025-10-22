@@ -1,4 +1,5 @@
-import { Hono } from "hono";
+import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import { z } from "zod";
 import {
   createNote,
   deleteNote,
@@ -6,148 +7,310 @@ import {
   getNoteById,
   updateNote,
 } from "./notesService";
-import type { CreateNoteRequest, UpdateNoteRequest } from "./types";
+import {
+  CreateNoteSchema,
+  NoteParamsSchema,
+  NoteSchema,
+  UpdateNoteSchema,
+} from "./types";
 
-function createSuccessResponse(data: unknown) {
-  return {
-    success: true,
-    data,
-    ...(Array.isArray(data) && { count: data.length }),
-  };
-}
+export const notesRouter = new OpenAPIHono();
 
-function createErrorResponse(error: string) {
-  return {
-    success: false,
-    error,
-  };
-}
-
-function validateCreateNoteRequest(body: any): body is CreateNoteRequest {
-  return (
-    body &&
-    typeof body.title === "string" &&
-    body.title.trim().length > 0 &&
-    typeof body.content === "string" &&
-    body.content.trim().length > 0
-  );
-}
-
-function validateUpdateNoteRequest(body: any): body is UpdateNoteRequest {
-  if (!body || typeof body !== "object") {
-    return false;
-  }
-
-  const hasTitle = body.title !== undefined;
-  const hasContent = body.content !== undefined;
-
-  if (!hasTitle && !hasContent) {
-    return false;
-  }
-
-  if (
-    hasTitle &&
-    (typeof body.title !== "string" || body.title.trim().length === 0)
-  ) {
-    return false;
-  }
-
-  if (
-    hasContent &&
-    (typeof body.content !== "string" || body.content.trim().length === 0)
-  ) {
-    return false;
-  }
-
-  return true;
-}
-
-export const notesRouter = new Hono();
-
-notesRouter.get("/", (c) => {
-  const notes = getAllNotes();
-  return c.json(createSuccessResponse(notes));
+const getAllNotesRoute = createRoute({
+  method: "get",
+  path: "/",
+  tags: ["Notes"],
+  summary: "Get all notes",
+  description: "Retrieve a list of all notes",
+  responses: {
+    200: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            success: z.literal(true),
+            data: z.array(NoteSchema),
+            count: z.number(),
+          }),
+        },
+      },
+      description: "List of all notes",
+    },
+  },
 });
 
-notesRouter.get("/:id", (c) => {
-  const id = c.req.param("id");
+const getNoteByIdRoute = createRoute({
+  method: "get",
+  path: "/{id}",
+  tags: ["Notes"],
+  summary: "Get note by ID",
+  description: "Retrieve a specific note by its ID",
+  request: {
+    params: NoteParamsSchema,
+  },
+  responses: {
+    200: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            success: z.literal(true),
+            data: NoteSchema,
+          }),
+        },
+      },
+      description: "The requested note",
+    },
+    404: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            success: z.literal(false),
+            error: z.string(),
+          }),
+        },
+      },
+      description: "Note not found",
+    },
+  },
+});
+
+const createNoteRoute = createRoute({
+  method: "post",
+  path: "/",
+  tags: ["Notes"],
+  summary: "Create a new note",
+  description: "Create a new note with title and content",
+  request: {
+    body: {
+      content: {
+        "application/json": {
+          schema: CreateNoteSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    201: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            success: z.literal(true),
+            data: NoteSchema,
+          }),
+        },
+      },
+      description: "Note created successfully",
+    },
+    400: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            success: z.literal(false),
+            error: z.string(),
+          }),
+        },
+      },
+      description: "Invalid request data",
+    },
+  },
+});
+
+const updateNoteRoute = createRoute({
+  method: "put",
+  path: "/{id}",
+  tags: ["Notes"],
+  summary: "Update a note",
+  description: "Update an existing note's title and/or content",
+  request: {
+    params: NoteParamsSchema,
+    body: {
+      content: {
+        "application/json": {
+          schema: UpdateNoteSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            success: z.literal(true),
+            data: NoteSchema,
+          }),
+        },
+      },
+      description: "Note updated successfully",
+    },
+    400: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            success: z.literal(false),
+            error: z.string(),
+          }),
+        },
+      },
+      description: "Invalid request data",
+    },
+    404: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            success: z.literal(false),
+            error: z.string(),
+          }),
+        },
+      },
+      description: "Note not found",
+    },
+  },
+});
+
+const deleteNoteRoute = createRoute({
+  method: "delete",
+  path: "/{id}",
+  tags: ["Notes"],
+  summary: "Delete a note",
+  description: "Delete an existing note by its ID",
+  request: {
+    params: NoteParamsSchema,
+  },
+  responses: {
+    200: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            success: z.literal(true),
+            message: z.string(),
+          }),
+        },
+      },
+      description: "Note deleted successfully",
+    },
+    404: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            success: z.literal(false),
+            error: z.string(),
+          }),
+        },
+      },
+      description: "Note not found",
+    },
+  },
+});
+
+notesRouter.openapi(getAllNotesRoute, (c) => {
+  const notes = getAllNotes();
+  return c.json({
+    success: true,
+    data: notes,
+    count: notes.length,
+  });
+});
+
+notesRouter.openapi(getNoteByIdRoute, (c) => {
+  const { id } = c.req.valid("param");
   const note = getNoteById(id);
 
   if (!note) {
-    return c.json(createErrorResponse("Note not found"), 404);
+    return c.json(
+      {
+        success: false,
+        error: "Note not found",
+      },
+      404
+    );
   }
 
-  return c.json(createSuccessResponse(note));
+  return c.json(
+    {
+      success: true,
+      data: note,
+    },
+    200
+  );
 });
 
-notesRouter.post("/", async (c) => {
+notesRouter.openapi(createNoteRoute, async (c) => {
+  const body = c.req.valid("json");
+
   try {
-    const body = await c.req.json();
-
-    if (!validateCreateNoteRequest(body)) {
-      return c.json(
-        createErrorResponse(
-          "Title and content are required and must be non-empty strings"
-        ),
-        400
-      );
-    }
-
-    const note = createNote({
-      title: body.title.trim(),
-      content: body.content.trim(),
-    });
-
-    return c.json(createSuccessResponse(note), 201);
-  } catch (error) {
-    return c.json(createErrorResponse(JSON.stringify(error)), 400);
+    const note = createNote(body);
+    return c.json(
+      {
+        success: true,
+        data: note,
+      },
+      201
+    );
+  } catch {
+    return c.json(
+      {
+        success: false,
+        error: "Failed to create note",
+      },
+      400
+    );
   }
 });
 
-notesRouter.put("/:id", async (c) => {
+notesRouter.openapi(updateNoteRoute, async (c) => {
+  const { id } = c.req.valid("param");
+  const body = c.req.valid("json");
+
   try {
-    const id = c.req.param("id");
-    const body = await c.req.json();
-
-    if (!validateUpdateNoteRequest(body)) {
-      return c.json(
-        createErrorResponse(
-          "At least one field (title or content) must be provided as a non-empty string"
-        ),
-        400
-      );
-    }
-
-    const updateData: UpdateNoteRequest = {};
-    if (body.title !== undefined) {
-      updateData.title = body.title.trim();
-    }
-    if (body.content !== undefined) {
-      updateData.content = body.content.trim();
-    }
-
-    const updatedNote = updateNote(id, updateData);
+    const updatedNote = updateNote(id, body);
 
     if (!updatedNote) {
-      return c.json(createErrorResponse("Note not found"), 404);
+      return c.json(
+        {
+          success: false,
+          error: "Note not found",
+        },
+        404
+      );
     }
 
-    return c.json(createSuccessResponse(updatedNote));
-  } catch (error) {
-    return c.json(createErrorResponse(JSON.stringify(error)), 400);
+    return c.json(
+      {
+        success: true,
+        data: updatedNote,
+      },
+      200
+    );
+  } catch {
+    return c.json(
+      {
+        success: false,
+        error: "Failed to update note",
+      },
+      400
+    );
   }
 });
 
-notesRouter.delete("/:id", (c) => {
-  const id = c.req.param("id");
+notesRouter.openapi(deleteNoteRoute, (c) => {
+  const { id } = c.req.valid("param");
   const deleted = deleteNote(id);
 
   if (!deleted) {
-    return c.json(createErrorResponse("Note not found"), 404);
+    return c.json(
+      {
+        success: false,
+        error: "Note not found",
+      },
+      404
+    );
   }
 
-  return c.json({
-    success: true,
-    message: "Note deleted successfully",
-  });
+  return c.json(
+    {
+      success: true,
+      message: "Note deleted successfully",
+    },
+    200
+  );
 });
